@@ -17,3 +17,6 @@ dist-ssr/
 .DS_Store
 Thumbs.db
 *.local
+
+# Browser automation artifacts
+.playwright-mcp/
