@@ -1,0 +1,44 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]: S
+      - strong [ref=e7]: SkillUp
+    - generic [ref=e8]:
+      - link "Log in" [ref=e9] [cursor=pointer]:
+        - /url: /login
+      - link "Get started" [ref=e10] [cursor=pointer]:
+        - /url: /register
+  - main [ref=e11]:
+    - generic [ref=e12]:
+      - generic [ref=e13]: Claimed Skill → Assessed Skill → Skill Gap
+      - heading "Learn. Prove. Get hired." [level=1] [ref=e14]
+      - paragraph [ref=e15]: SkillUp turns self-claimed skills into AI-assessed proof, maps your skill graph, and shows exactly which gaps to close for your target role.
+      - generic [ref=e16]:
+        - link "Start free" [ref=e17] [cursor=pointer]:
+          - /url: /register
+        - link "See how gaps work" [ref=e18] [cursor=pointer]:
+          - /url: /skills/gap
+      - generic [ref=e19]:
+        - generic [ref=e20]: 1 · Claim skills
+        - text: →
+        - generic [ref=e21]: 2 · AI assessment
+        - text: →
+        - generic [ref=e22]: 3 · Skill graph
+        - text: →
+        - generic [ref=e23]: 4 · Gap analysis
+    - generic [ref=e24]:
+      - generic [ref=e25]:
+        - generic [ref=e26]:
+          - generic [ref=e27]: Claim your skills
+          - generic [ref=e28]: User Profile · Skill Management · Resume
+        - generic [ref=e29]: Add skills with self-levels and years of experience. Import your resume summary so everything lives in one profile.
+      - generic [ref=e30]:
+        - generic [ref=e31]:
+          - generic [ref=e32]: Get assessed by AI
+          - generic [ref=e33]: AI Skill Assessment · Progress Tracking
+        - generic [ref=e34]: Timed quizzes per skill produce a 0–100 score, a verified level, and strengths vs weaknesses you can act on.
+      - generic [ref=e35]:
+        - generic [ref=e36]:
+          - generic [ref=e37]: See gaps & graph
+          - generic [ref=e38]: Skill Graph · Skill Gap Analysis · Recommendations
+        - generic [ref=e39]: Compare current vs target levels for roles like Frontend or Backend Developer, and explore how your skills connect.

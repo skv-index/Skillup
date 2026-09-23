@@ -1,0 +1,96 @@
+/* Part 1 page-specific styles. Foundation tokens/classes only — no forks. */
+
+.auth-wrap {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: var(--space-6);
+  background: radial-gradient(1200px 500px at 20% -10%, var(--color-primary-100), transparent),
+    var(--color-bg);
+}
+.auth-card {
+  width: 100%;
+  max-width: 440px;
+}
+.auth-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-weight: var(--weight-extrabold);
+  font-size: var(--text-xl);
+  margin-bottom: var(--space-5);
+  justify-content: center;
+}
+
+.landing-hero {
+  text-align: center;
+  padding: var(--space-10) var(--space-4) var(--space-8);
+}
+.landing-hero h1 {
+  font-size: clamp(2rem, 5vw, 3.25rem);
+  line-height: 1.1;
+  font-weight: var(--weight-extrabold);
+  letter-spacing: -0.02em;
+}
+.landing-hero h1 span {
+  background: linear-gradient(90deg, var(--color-primary-600), var(--color-accent-500));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.landing-hero p {
+  color: var(--color-text-muted);
+  max-width: 640px;
+  margin: var(--space-4) auto 0;
+}
+.landing-cta {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: center;
+  margin-top: var(--space-6);
+  flex-wrap: wrap;
+}
+.flow-strip {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: var(--space-6);
+}
+
+.steps { display: flex; gap: var(--space-2); margin-bottom: var(--space-5); }
+.step {
+  flex: 1;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-border);
+}
+.step--done { background: var(--color-primary-500); }
+
+.graph-svg {
+  width: 100%;
+  height: auto;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+.graph-legend { display: flex; gap: var(--space-4); flex-wrap: wrap; }
+
+.quiz-option {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  margin-bottom: var(--space-2);
+}
+.quiz-option:hover { border-color: var(--color-primary-400); }
+.quiz-option--picked {
+  border-color: var(--color-primary-600);
+  background: var(--color-primary-50);
+}
