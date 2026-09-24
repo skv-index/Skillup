@@ -8,9 +8,12 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:schema": "node --env-file=.env scripts/apply-schema.mjs",
+    "db:schema:mgmt": "node --env-file=.env scripts/apply-schema-mgmt.mjs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.117.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.23.1"
@@ -19,6 +22,7 @@
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
+    "pg": "^8.23.0",
     "typescript": "^5.4.5",
     "vite": "^5.4.0"
   }
