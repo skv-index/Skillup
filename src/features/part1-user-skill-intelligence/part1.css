@@ -68,14 +68,195 @@
 }
 .step--done { background: var(--color-primary-500); }
 
-.graph-svg {
-  width: 100%;
-  height: auto;
+/* ── Skill Graph ───────────────────────────────── */
+.graph-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-4);
+}
+.graph-stat {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  box-shadow: var(--shadow-sm);
 }
-.graph-legend { display: flex; gap: var(--space-4); flex-wrap: wrap; }
+.graph-stat strong {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-extrabold);
+  line-height: 1;
+  color: var(--color-primary-700);
+}
+.graph-stat span {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-faint);
+}
+@media (max-width: 600px) {
+  .graph-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.graph-panel {
+  background:
+    radial-gradient(560px 320px at 50% 30%, var(--color-primary-100), transparent 70%),
+    linear-gradient(180deg, var(--color-surface-2), var(--color-surface));
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+  box-shadow: var(--shadow-sm);
+}
+[data-theme='dark'] .graph-panel {
+  background:
+    radial-gradient(560px 320px at 50% 30%, #312e81, transparent 70%),
+    linear-gradient(180deg, #1e293b, #0f172a);
+}
+.graph-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.graph-bg {
+  fill: transparent;
+  cursor: default;
+}
+.graph-edge {
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  transition: opacity 0.18s ease;
+}
+.node {
+  cursor: pointer;
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 0.16s ease;
+}
+.node:hover {
+  transform: scale(1.08);
+}
+.node-dim {
+  opacity: 0.45;
+  transition: opacity 0.18s ease;
+}
+.node__pulse {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  opacity: 0;
+  animation: node-pulse 1.8s ease-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@keyframes node-pulse {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.55;
+  }
+  70% {
+    transform: scale(1.18);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.18);
+    opacity: 0;
+  }
+}
+.graph-foot {
+  color: var(--color-text-faint);
+  margin-top: var(--space-2);
+  padding: 0 var(--space-1);
+}
+.graph-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-top: var(--space-4);
+}
+.graph-bar .graph-legend {
+  margin-top: 0;
+}
+.graph-legend {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.graph-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-weight: var(--weight-semibold);
+  text-transform: capitalize;
+}
+.graph-legend__sep {
+  width: 1px;
+  height: 14px;
+  background: var(--color-border-strong);
+  margin: 0 var(--space-1);
+}
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-full);
+  display: inline-block;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+.swatch {
+  width: 18px;
+  height: 10px;
+  border-radius: 3px;
+  display: inline-block;
+}
+.swatch--fill {
+  background: var(--color-primary-600);
+}
+.swatch--dash {
+  border: 1.5px dashed var(--color-text-faint);
+  background: transparent;
+}
+
+/* ── Segmented view toggle ──────────────────────── */
+.seg {
+  display: inline-flex;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  padding: 3px;
+  gap: 2px;
+  margin-left: auto;
+}
+.seg__btn {
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.seg__btn:hover:not(:disabled) {
+  color: var(--color-text);
+}
+.seg__btn--active {
+  background: var(--color-primary-600);
+  color: #fff;
+}
+.seg__btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  color: var(--color-text-faint);
+}
 
 .quiz-option {
   display: block;
