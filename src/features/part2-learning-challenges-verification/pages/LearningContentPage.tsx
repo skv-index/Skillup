@@ -5,11 +5,15 @@ import { useAuth } from '@/lib/auth-context';
 import { paths } from '@/app/paths';
 import { CHALLENGES, courseById } from '../data/catalog';
 import {
+  clearAiDraft,
   completedLessons,
   currentUser,
+  getAiDraft,
   progressForCourse,
+  saveAiDraft,
   toggleLesson,
 } from '../services/part2-store';
+import { aiAvailable, draftCourseContent } from '../services/ai';
 import { getGaps } from '@/features/part1-user-skill-intelligence/services/part1-store';
 import { skillById } from '@/features/part1-user-skill-intelligence/data/catalog';
 import { LevelBadge } from '@/features/part1-user-skill-intelligence/components/Part1Widgets';
@@ -19,6 +23,8 @@ export function LearningContentPage() {
   const { user } = useAuth();
   const { contentId } = useParams<{ contentId: string }>();
   const [version, setVersion] = useState(0);
+  const [draftBusy, setDraftBusy] = useState(false);
+  const [draftMsg, setDraftMsg] = useState('');
 
   if (!user) return <Navigate to={paths.login} replace />;
   const course = contentId ? courseById(contentId) : undefined;
@@ -49,6 +55,30 @@ export function LearningContentPage() {
   const completeAll = () => {
     course.lessons.forEach((l) => toggleLesson(course.id, l.id, true, uid));
     setVersion((v) => v + 1);
+  };
+
+  const draft = getAiDraft(course.id, uid);
+
+  const generateDraft = async () => {
+    setDraftBusy(true);
+    setDraftMsg('');
+    try {
+      const result = await draftCourseContent({
+        skill: skillById(course.skillId)?.name ?? course.skillId,
+        level: course.level,
+        courseTitle: course.title,
+        blurb: course.blurb,
+        existingTitles: course.lessons.map((l) => l.title),
+      });
+      saveAiDraft(course.id, result, uid);
+      setVersion((v) => v + 1);
+      if (!result.lessons.length && !result.quiz.length) setDraftMsg('AI returned nothing — try again.');
+    } catch (err) {
+      setDraftMsg(err instanceof Error ? `AI error: ${err.message}` : 'Draft failed.');
+    } finally {
+      setDraftBusy(false);
+      setTimeout(() => setDraftMsg(''), 5000);
+    }
   };
 
   const pct = progress?.percent ?? 0;
@@ -142,6 +172,61 @@ export function LearningContentPage() {
                   View challenge
                 </Link>
               </div>
+            </Card>
+          )}
+
+          {aiAvailable() && (
+            <Card
+              title="✨ AI draft — extra lessons & quiz"
+              subtitle="Curated suggestion for review (not added to the course)"
+              className="mt-4"
+              actions={
+                <>
+                  {draft && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        clearAiDraft(course.id, uid);
+                        setVersion((v) => v + 1);
+                      }}
+                    >
+                      Discard
+                    </Button>
+                  )}
+                  <Button size="sm" variant="secondary" onClick={generateDraft} disabled={draftBusy}>
+                    {draftBusy ? 'Drafting…' : draft ? 'Regenerate' : 'Draft lessons'}
+                  </Button>
+                </>
+              }
+            >
+              {draftMsg && <Alert variant="error">{draftMsg}</Alert>}
+              {!draft && !draftMsg && <p className="small muted">Generate a draft lesson plan + quiz for this skill.</p>}
+              {draft && (
+                <div className="stack-4 small">
+                  {draft.lessons.map((l, i) => (
+                    <div key={i} className="lesson-row">
+                      <div>
+                        <strong className="small">
+                          {i + 1}. {l.title}
+                        </strong>
+                        <div className="tiny muted">
+                          {l.kind} · {l.minutes} min
+                        </div>
+                      </div>
+                      <Badge variant="info">draft</Badge>
+                    </div>
+                  ))}
+                  {draft.quiz.map((q, i) => (
+                    <div key={`q${i}`} className="card" style={{ padding: 12 }}>
+                      <strong className="small">Quiz {i + 1}: {q.prompt}</strong>
+                      <div className="tiny muted mt-4">
+                        {q.options.map((o, j) => `${String.fromCharCode(65 + j)}. ${o} ${j === q.answerIndex ? '✓' : ''}`).join('  ·  ')}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </Card>
           )}
         </div>

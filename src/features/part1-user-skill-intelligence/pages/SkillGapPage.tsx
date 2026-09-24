@@ -1,18 +1,21 @@
 import { useMemo, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import { Badge, Button, Card, ProgressBar, Select, Table } from '@/components/ui';
+import { Alert, Badge, Button, Card, ProgressBar, Select, Table } from '@/components/ui';
 import { useAuth } from '@/lib/auth-context';
 import { paths } from '@/app/paths';
 import type { SkillLevel } from '@/types';
 import { TARGET_ROLES, skillById } from '../data/catalog';
 import {
   currentUserId,
+  getClaimed,
   getGaps,
   getPrefs,
+  getResults,
   refreshGaps,
   savePrefs,
   setGapTarget,
 } from '../services/part1-store';
+import { aiAvailable, analyzeGaps, type GapInsight } from '../services/ai';
 import { EmptyCta, LevelBadge } from '../components/Part1Widgets';
 import '../part1.css';
 
@@ -23,6 +26,9 @@ export function SkillGapPage() {
   const [version, setVersion] = useState(0);
   const [filter, setFilter] = useState<Filter>('all');
   const [roleId, setRoleId] = useState(() => getPrefs().targetRoleId);
+  const [insights, setInsights] = useState<GapInsight[]>([]);
+  const [insightBusy, setInsightBusy] = useState(false);
+  const [insightMsg, setInsightMsg] = useState('');
 
   if (!user) return <Navigate to={paths.login} replace />;
   const uid = currentUserId();
@@ -52,6 +58,26 @@ export function SkillGapPage() {
   const changeTarget = (skillId: string, level: SkillLevel) => {
     setGapTarget(skillId, level, uid);
     setVersion((v) => v + 1);
+  };
+
+  const runInsights = async () => {
+    setInsightBusy(true);
+    setInsightMsg('');
+    try {
+      const targetRole = TARGET_ROLES.find((r) => r.id === roleId)?.title ?? '';
+      const res = await analyzeGaps(gaps, {
+        targetRole,
+        results: getResults(uid),
+        claimed: getClaimed(uid),
+      });
+      setInsights(res);
+      if (!res.length) setInsightMsg('No insights returned — try again.');
+    } catch (err) {
+      setInsightMsg(err instanceof Error ? `AI error: ${err.message}` : 'AI analysis failed.');
+    } finally {
+      setInsightBusy(false);
+      setTimeout(() => setInsightMsg(''), 5000);
+    }
   };
 
   return (
@@ -173,6 +199,38 @@ export function SkillGapPage() {
           />
         )}
       </div>
+
+      {aiAvailable() && (
+        <Card
+          title="AI gap insights"
+          subtitle="Why these gaps matter for your role — and what to do first"
+          className="mt-4"
+          actions={
+            <Button size="sm" onClick={runInsights} disabled={insightBusy || gaps.length === 0}>
+              {insightBusy ? 'Analyzing…' : insights.length ? 'Re-run analysis' : 'Generate insights'}
+            </Button>
+          }
+        >
+          {insightMsg && <Alert variant="error">{insightMsg}</Alert>}
+          {insights.length === 0 && !insightMsg && (
+            <p className="small muted">Generate AI-powered, prioritized advice for your skill gaps.</p>
+          )}
+          {insights.map((i) => (
+            <div key={i.skillId} className="card mt-4" style={{ padding: 12 }}>
+              <div className="row row--between">
+                <strong className="small">{i.skillName}</strong>
+                <Badge variant={i.priority === 'high' ? 'danger' : i.priority === 'medium' ? 'warning' : 'info'}>
+                  {i.priority} priority
+                </Badge>
+              </div>
+              <p className="tiny muted mt-4">{i.why}</p>
+              <p className="tiny mt-4">
+                <strong>Next:</strong> {i.action}
+              </p>
+            </div>
+          ))}
+        </Card>
+      )}
     </div>
   );
 }

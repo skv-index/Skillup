@@ -16,6 +16,7 @@ import {
   saveResume,
   seedStarterSkills,
 } from '../services/part1-store';
+import { aiAvailable, extractSkillsFromResume } from '../services/ai';
 import { EmptyCta, LevelBadge, StatusBadge } from '../components/Part1Widgets';
 import '../part1.css';
 
@@ -32,6 +33,7 @@ export function MySkillsPage() {
   const [education, setEducation] = useState(() => getResume().education);
   const [links, setLinks] = useState(() => getResume().links);
   const [resumeMsg, setResumeMsg] = useState('');
+  const [extractBusy, setExtractBusy] = useState(false);
 
   if (!user) return <Navigate to={paths.login} replace />;
   const uid = currentUserId();
@@ -59,6 +61,32 @@ export function MySkillsPage() {
     saveResume({ summary, experience, education, links, rawText: `${summary}\n${experience}` }, uid);
     setResumeMsg(`Saved · ${new Date().toLocaleTimeString()}`);
     setTimeout(() => setResumeMsg(''), 2500);
+  };
+
+  const extractFromResume = async () => {
+    const text = `${summary}\n${experience}`;
+    if (!text.trim()) {
+      setResumeMsg('Add a summary or experience first.');
+      setTimeout(() => setResumeMsg(''), 3000);
+      return;
+    }
+    setExtractBusy(true);
+    setResumeMsg('Analyzing resume…');
+    try {
+      const found = await extractSkillsFromResume(text, SKILLS_CATALOG);
+      if (!found.length) {
+        setResumeMsg('No catalog skills detected — adjust the resume text.');
+      } else {
+        found.forEach((s) => addClaimed(s.skillId, s.selfLevel, s.yearsExperience, uid));
+        setResumeMsg(`Added ${found.length} skill${found.length > 1 ? 's' : ''} from resume.`);
+        bump();
+      }
+    } catch (err) {
+      setResumeMsg(err instanceof Error ? `AI error: ${err.message}` : 'AI extraction failed.');
+    } finally {
+      setExtractBusy(false);
+      setTimeout(() => setResumeMsg(''), 4000);
+    }
   };
 
   return (
@@ -193,6 +221,11 @@ export function MySkillsPage() {
           <Button size="sm" onClick={save}>
             Save resume
           </Button>
+          {aiAvailable() && (
+            <Button size="sm" variant="secondary" onClick={extractFromResume} disabled={extractBusy}>
+              {extractBusy ? 'Analyzing…' : '✨ Extract skills (AI)'}
+            </Button>
+          )}
           {resumeMsg && <span className="tiny muted">{resumeMsg}</span>}
         </div>
       </Card>

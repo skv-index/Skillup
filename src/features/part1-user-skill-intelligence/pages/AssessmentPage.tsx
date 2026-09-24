@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { Alert, Badge, Button, Card, ProgressBar } from '@/components/ui';
 import { useAuth } from '@/lib/auth-context';
@@ -8,7 +8,9 @@ import {
   questionsForAssessment,
   skillById,
 } from '../data/catalog';
-import { currentUserId, saveResult } from '../services/part1-store';
+import type { QuizQuestion } from '../data/catalog';
+import { currentUserId, effectiveLevel, saveResult } from '../services/part1-store';
+import { aiAvailable, generateQuestions } from '../services/ai';
 import '../part1.css';
 
 function fmt(sec: number): string {
@@ -23,11 +25,40 @@ export function AssessmentPage() {
   const navigate = useNavigate();
 
   const assessment = assessmentId ? assessmentById(assessmentId) : undefined;
-  const questions = useMemo(() => (assessmentId ? questionsForAssessment(assessmentId) : []), [assessmentId]);
+  const staticQuestions = useMemo(() => (assessmentId ? questionsForAssessment(assessmentId) : []), [assessmentId]);
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [left, setLeft] = useState((assessment?.durationMinutes ?? 10) * 60);
   const [finished, setFinished] = useState(false);
+  const [aiQuestions, setAiQuestions] = useState<QuizQuestion[]>([]);
+  const [aiStatus, setAiStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+
+  // Track latest answers/index without re-triggering the AI effect.
+  const stateRef = useRef({ answers, index });
+  stateRef.current = { answers, index };
+
+  useEffect(() => {
+    if (!assessment || !user || !aiAvailable()) return;
+    setAiStatus('loading');
+    generateQuestions({
+      assessmentId: assessment.id,
+      skill: skillById(assessment.skillId)?.name ?? assessment.title,
+      level: effectiveLevel(assessment.skillId, currentUserId()).level,
+      count: assessment.questionCount,
+    })
+      .then((qs) => {
+        if (qs.length) {
+          // Only adopt AI questions before the user started answering.
+          if (Object.keys(stateRef.current.answers).length === 0 && stateRef.current.index === 0) {
+            setAiQuestions(qs);
+          }
+          setAiStatus('ready');
+        } else {
+          setAiStatus('error');
+        }
+      })
+      .catch(() => setAiStatus('error'));
+  }, [user, assessment]);
 
   useEffect(() => {
     if (finished) return;
@@ -59,7 +90,9 @@ export function AssessmentPage() {
   }
 
   const skill = skillById(assessment.skillId);
-  const q = questions[index];
+  const questions = aiQuestions.length > 0 ? aiQuestions : staticQuestions;
+  const qIndex = Math.min(index, questions.length - 1);
+  const q = questions[qIndex];
   const answered = Object.keys(answers).length;
 
   const submit = () => {
@@ -105,12 +138,16 @@ export function AssessmentPage() {
             {skill?.name} · {questions.length} questions · {assessment.durationMinutes} min · Progress Tracking
           </p>
         </div>
-        <Badge variant={left < 60 ? 'danger' : 'info'}>⏱ {fmt(left)}</Badge>
+        <div className="row">
+          {aiStatus === 'loading' && <Badge variant="info">Generating AI questions…</Badge>}
+          {aiStatus === 'ready' && aiQuestions.length > 0 && <Badge variant="primary">AI-adaptive</Badge>}
+          <Badge variant={left < 60 ? 'danger' : 'info'}>⏱ {fmt(left)}</Badge>
+        </div>
       </div>
 
       <ProgressBar value={answered} max={questions.length} label={`Answered ${answered}/${questions.length}`} />
 
-      <Card title={`Q${index + 1}. ${q.prompt}`} subtitle={q.topic} className="mt-4">
+      <Card title={`Q${qIndex + 1}. ${q.prompt}`} subtitle={q.topic} className="mt-4">
         <div>
           {q.options.map((opt, i) => (
             <button
@@ -123,10 +160,10 @@ export function AssessmentPage() {
           ))}
         </div>
         <div className="row row--between mt-4">
-          <Button variant="ghost" disabled={index === 0} onClick={() => setIndex((v) => v - 1)}>
+          <Button variant="ghost" disabled={qIndex === 0} onClick={() => setIndex((v) => v - 1)}>
             Previous
           </Button>
-          {index < questions.length - 1 ? (
+          {qIndex < questions.length - 1 ? (
             <Button onClick={() => setIndex((v) => v + 1)}>Next</Button>
           ) : (
             <Button onClick={submit} disabled={answered < questions.length}>

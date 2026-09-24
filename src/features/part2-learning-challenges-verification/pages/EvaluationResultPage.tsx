@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, Navigate, useLocation, useParams } from 'react-router-dom';
 import { Alert, Badge, Button, Card, ProgressBar } from '@/components/ui';
 import { useAuth } from '@/lib/auth-context';
@@ -7,9 +7,11 @@ import { challengeById } from '../data/catalog';
 import {
   currentUser,
   getEvaluations,
+  improveEvaluationFeedback,
   latestEvaluationForChallenge,
   verifiedForSkill,
 } from '../services/part2-store';
+import { aiAvailable } from '../services/ai';
 import { skillById } from '@/features/part1-user-skill-intelligence/data/catalog';
 import '../part2.css';
 
@@ -17,6 +19,8 @@ export function EvaluationResultPage() {
   const { user } = useAuth();
   const { challengeId } = useParams<{ challengeId: string }>();
   const location = useLocation() as { state?: { evaluationId?: string } };
+  const [version, setVersion] = useState(0);
+  const [feedbackBusy, setFeedbackBusy] = useState(false);
 
   if (!user) return <Navigate to={paths.login} replace />;
   const uid = currentUser();
@@ -27,7 +31,20 @@ export function EvaluationResultPage() {
     }
     return challengeId ? latestEvaluationForChallenge(challengeId, uid) : [...getEvaluations(uid)].reverse()[0];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [challengeId, uid]);
+  }, [challengeId, uid, version]);
+
+  const rephraseFeedback = async () => {
+    if (!evaluation) return;
+    setFeedbackBusy(true);
+    try {
+      await improveEvaluationFeedback(evaluation.id, uid);
+      setVersion((v) => v + 1);
+    } catch {
+      /* keep original feedback */
+    } finally {
+      setFeedbackBusy(false);
+    }
+  };
 
   if (!evaluation) {
     return (
@@ -90,7 +107,17 @@ export function EvaluationResultPage() {
         </Card>
 
         <div>
-          <Card title="Feedback" subtitle="What the rubric saw">
+          <Card
+            title="Feedback"
+            subtitle={aiAvailable() ? 'AI-adjusted' : 'What the rubric saw'}
+            actions={
+              aiAvailable() && evaluation ? (
+                <Button size="sm" variant="secondary" onClick={rephraseFeedback} disabled={feedbackBusy}>
+                  {feedbackBusy ? 'Rewriting…' : '✨ Improve (AI)'}
+                </Button>
+              ) : undefined
+            }
+          >
             <p className="small">{evaluation.feedback}</p>
             {challenge && (
               <p className="small muted mt-4">

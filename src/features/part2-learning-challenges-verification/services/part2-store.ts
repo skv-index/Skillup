@@ -11,6 +11,7 @@
 import type { Evaluation, LearningProgress, SkillLevel, VerifiedSkill } from '@/types';
 import { storage, uid } from '@/lib/utils';
 import { COURSES, challengeById, challengesForSkill } from '../data/catalog';
+import { aiAvailable, gradeChallenge, improveFeedback, type AiCourseDraft } from './ai';
 // Read-only consumption of Part 1 outputs (integration contract):
 import {
   currentUserId as part1User,
@@ -43,6 +44,7 @@ const K = {
   submissions: (u: string) => `skillup.part2.submissions.${u}`,
   evaluations: (u: string) => `skillup.part2.evaluations.${u}`,
   verified: (u: string) => `skillup.part2.verified.${u}`,
+  drafts: (u: string) => `skillup.part2.aidrafts.${u}`,
 };
 
 function read<T>(key: string, fallback: T): T {
@@ -124,16 +126,6 @@ export function submitChallenge(
   userId: string = currentUser(),
 ): StoredEvaluation {
   const challenge = challengeById(challengeId);
-  const submission: Submission = {
-    id: uid('sub'),
-    challengeId,
-    userId,
-    solution,
-    checks,
-    submittedAt: new Date().toISOString(),
-  };
-  write(K.submissions(userId), [...getSubmissions(userId), submission]);
-
   const completeness = checks.length === 0 ? 0 : Math.round((checks.filter(Boolean).length / checks.length) * 60);
   const substance = Math.min(30, Math.floor(solution.trim().length / 40));
   const prior = challenge?.skillIds.some((s) => {
@@ -149,21 +141,124 @@ export function submitChallenge(
     ? `Solid work (${score}/100). ${missing.length === 0 ? 'All requirements met.' : `Polish: ${missing.slice(0, 2).join('; ')}.`} Eligible for verification.`
     : `Not yet (${score}/100). Focus: ${missing.slice(0, 2).join('; ') || 'add more substance to your solution'}. Review the linked course, then resubmit.`;
 
+  return saveEvaluation({ challengeId, solution, checks, userId, score, passed, feedback, breakdown: { completeness, substance, priorBonus } });
+}
+
+/** AI-graded submission — uses Groq when configured, else deterministic rubric. */
+export async function submitChallengeAi(
+  challengeId: string,
+  solution: string,
+  checks: boolean[],
+  userId: string = currentUser(),
+): Promise<StoredEvaluation> {
+  const challenge = challengeById(challengeId);
+  if (!challenge || !aiAvailable()) return submitChallenge(challengeId, solution, checks, userId);
+
+  const prior = challenge.skillIds.some((s) => {
+    const r = latestResultForSkill(s, userId);
+    return r && r.score >= 40;
+  });
+  const priorBonus = prior ? 10 : 0;
+
+  try {
+    const ai = await gradeChallenge({ challenge, solution, checks, priorBonus });
+    const score = Math.min(100, ai.completeness + ai.substance + ai.priorBonus);
+    const passed = score >= 60;
+    const missing = challenge.checklist.filter((_, i) => !checks[i]);
+    const feedback = `${ai.feedback}${passed ? '' : ` Focus next on: ${missing.slice(0, 2).join('; ') || 'adding more evidence to your solution'}.`}`;
+    return saveEvaluation({
+      challengeId,
+      solution,
+      checks,
+      userId,
+      score,
+      passed,
+      feedback,
+      breakdown: { completeness: ai.completeness, substance: ai.substance, priorBonus: ai.priorBonus },
+    });
+  } catch {
+    return submitChallenge(challengeId, solution, checks, userId);
+  }
+}
+
+/** Rewrite stored evaluation feedback with AI (feature: feedback generation). */
+export async function improveEvaluationFeedback(
+  evaluationId: string,
+  userId: string = currentUser(),
+): Promise<StoredEvaluation> {
+  const list = getEvaluations(userId);
+  const evaluation = list.find((e) => e.id === evaluationId);
+  if (!evaluation) throw new Error('Evaluation not found.');
+  if (!aiAvailable()) return evaluation;
+
+  const challenge = challengeById(evaluation.challengeId);
+  const submission = getSubmissions(userId).find((s) => s.id === evaluation.submissionId);
+  if (!challenge || !submission) return evaluation;
+
+  const better = await improveFeedback({
+    challenge,
+    solution: submission.solution,
+    checks: submission.checks,
+    score: evaluation.score,
+    currentFeedback: evaluation.feedback,
+  });
+
+  const updated: StoredEvaluation = { ...evaluation, feedback: better };
+  write(K.evaluations(userId), list.map((e) => (e.id === evaluationId ? updated : e)));
+  return updated;
+}
+
+function saveEvaluation(input: {
+  challengeId: string;
+  solution: string;
+  checks: boolean[];
+  userId: string;
+  score: number;
+  passed: boolean;
+  feedback: string;
+  breakdown: StoredEvaluation['breakdown'];
+}): StoredEvaluation {
+  const submission: Submission = {
+    id: uid('sub'),
+    challengeId: input.challengeId,
+    userId: input.userId,
+    solution: input.solution,
+    checks: input.checks,
+    submittedAt: new Date().toISOString(),
+  };
+  write(K.submissions(input.userId), [...getSubmissions(input.userId), submission]);
+
   const evaluation: StoredEvaluation = {
     id: uid('ev'),
-    userId,
-    challengeId,
-    score,
-    feedback,
-    passed,
+    userId: input.userId,
+    challengeId: input.challengeId,
+    score: input.score,
+    feedback: input.feedback,
+    passed: input.passed,
     evaluatedAt: new Date().toISOString(),
-    breakdown: { completeness, substance, priorBonus },
+    breakdown: input.breakdown,
     submissionId: submission.id,
   };
-  write(K.evaluations(userId), [...getEvaluations(userId), evaluation]);
+  write(K.evaluations(input.userId), [...getEvaluations(input.userId), evaluation]);
 
-  if (passed) autoVerify(challengeId, evaluation, userId);
+  if (input.passed) autoVerify(input.challengeId, evaluation, input.userId);
   return evaluation;
+}
+
+/* ── AI course content drafts (feature: course content generation) ───────── */
+export function getAiDraft(courseId: string, userId: string = currentUser()): AiCourseDraft | undefined {
+  return read<Record<string, AiCourseDraft & { generatedAt: string }>>(K.drafts(userId), {})[courseId];
+}
+
+export function saveAiDraft(courseId: string, draft: AiCourseDraft, userId: string = currentUser()): void {
+  const all = read<Record<string, AiCourseDraft & { generatedAt: string }>>(K.drafts(userId), {});
+  write(K.drafts(userId), { ...all, [courseId]: { ...draft, generatedAt: new Date().toISOString() } });
+}
+
+export function clearAiDraft(courseId: string, userId: string = currentUser()): void {
+  const all = read<Record<string, AiCourseDraft & { generatedAt: string }>>(K.drafts(userId), {});
+  delete all[courseId];
+  write(K.drafts(userId), all);
 }
 
 /* ── Verification ───────────────────────────────── */
